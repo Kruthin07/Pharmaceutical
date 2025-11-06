@@ -2,14 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>BlitZz Pharmacy</title>
-
+    <title>BliTZz Pharmacy</title>
+    <link rel="stylesheet" href="styles.css" />
     <!-- Charts -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-    <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Excel export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
+    <!-- PDF export -->
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <!-- (Optional) Firebase for cloud backup. Replace config below if you want to enable. -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
   </head>
   <body>
     <div class="app">
@@ -246,6 +252,13 @@
               <button type="button" class="btn small ghost" id="clearRange">Clear</button>
             </div>
 
+            <div class="form-row" style="margin-top: 10px">
+              <button type="button" class="btn small" id="exportAuditExcel">Export Audit (Excel)</button>
+              <button type="button" class="btn small" id="exportAuditPDF">Export Audit (PDF)</button>
+              <button type="button" class="btn small ghost" id="auditSignJSON">Sign Audit (JSON)</button>
+              <button type="button" class="btn small ghost" id="backupToCloud">Backup to Cloud</button>
+            </div>
+
             <div class="cards" style="margin-top: 10px">
               <div class="card">
                 <h2>Stock distribution</h2>
@@ -260,7 +273,7 @@
 
             <div class="cards" style="margin-top: 10px">
               <div class="card" style="flex: 2">
-                <h2>Monthly sales</h2>
+                <h2>Monthly sales (last 12 months)</h2>
                 <canvas id="monthlySalesChart" width="500" height="240" aria-label="Monthly sales chart" role="img"></canvas>
               </div>
 
@@ -352,6 +365,10 @@
             <option value="4">★★★★</option>
             <option value="5">★★★★★</option>
           </select>
+          <!-- NEW: Controlled drug flag (optional UI) -->
+          <label class="muted" style="display:flex;align-items:center;gap:6px">
+            <input id="medControlled" type="checkbox" /> Controlled drug
+          </label>
         </div>
 
         <div class="modal-actions">
