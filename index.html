@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Pharmacy Manager — Dashboard (Prototype)</title>
 
@@ -28,7 +29,6 @@
         </nav>
 
         <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px">
-          <!-- Tip removed -->
           <div class="import-export">
             <button type="button" class="btn small" id="exportBtn">Export JSON</button>
             <button type="button" class="btn small ghost" id="importBtn">Import JSON</button>
@@ -126,7 +126,6 @@
                 <input id="lowStockThreshold" type="number" min="1" style="width:100px" />
                 <button type="button" class="btn small" id="applyLowStockThreshold">Apply</button>
 
-                <!-- NEW: compose reorder -->
                 <select id="reorderSupplier" title="Compose for a specific supplier">
                   <option value="">All suppliers</option>
                 </select>
@@ -160,7 +159,7 @@
         <section id="view-expiry" style="display: none">
           <div class="card">
             <h2>Expiry Tracker</h2>
-            <div class="muted">Shows medicines expiring soon and already expired.</div>
+            <div class="muted">Shows medicines expiring within 30 days and already expired.</div>
             <div class="table-wrap" style="margin-top: 10px">
               <table id="expiryTable">
                 <thead>
@@ -325,7 +324,7 @@
       </div>
     </div>
 
-    <!-- Medicine & Supplier Modals (unchanged UI placeholders) -->
+    <!-- Medicine & Supplier Modals (placeholders) -->
     <div class="modal" id="medModal" role="dialog" aria-modal="true" aria-labelledby="medModalTitle">
       <div class="modal-card">
         <div class="modal-header">
