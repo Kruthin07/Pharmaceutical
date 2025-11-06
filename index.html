@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Pharmacy Manager — Dashboard (Prototype)</title>
+
+    <!-- Charts -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">💊 Pharmacy Manager</div>
+        <div class="muted">Data persists to localStorage.</div>
+
+        <nav class="nav" id="mainNav">
+          <button type="button" data-view="dashboard" class="active">Dashboard</button>
+          <button type="button" data-view="inventory">Inventory</button>
+          <button type="button" data-view="lowstock" id="lowStockNav">Low Stock</button>
+          <button type="button" data-view="expiry">Expiry</button>
+          <button type="button" data-view="suppliers">Suppliers</button>
+          <button type="button" data-view="sales">Sales</button>
+          <button type="button" data-view="reports">Reports</button>
+          <button type="button" data-view="settings">Settings</button>
+        </nav>
+
+        <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px">
+          <!-- Tip removed -->
+          <div class="import-export">
+            <button type="button" class="btn small" id="exportBtn">Export JSON</button>
+            <button type="button" class="btn small ghost" id="importBtn">Import JSON</button>
+            <input id="importFile" type="file" accept="application/json" style="display: none" />
+          </div>
+        </div>
+      </aside>
+
+      <main class="content">
+        <!-- Dashboard -->
+        <section id="view-dashboard">
+          <div class="cards">
+            <div class="card">
+              <h2>Inventory summary</h2>
+              <div class="muted" id="summaryInventory">Loading...</div>
+            </div>
+
+            <div class="card">
+              <h2>Expiry alerts</h2>
+              <div class="muted" id="summaryExpiry">Loading...</div>
+            </div>
+
+            <div class="card">
+              <h2>Today's sales</h2>
+              <div class="muted" id="summarySales">Loading...</div>
+            </div>
+          </div>
+
+          <div class="cards">
+            <div class="card" style="flex: 2">
+              <h2>Quick actions</h2>
+              <div class="form-row" style="margin-top: 10px">
+                <input id="quickSearch" placeholder="Search medicine by name..." />
+                <button type="button" class="btn small" id="addMedQuick">Add medicine</button>
+                <button type="button" class="btn small ghost" id="promoSoon">Promote soon-to-expire</button>
+                <button type="button" class="btn small ghost" id="gotoLowStock">View low stock</button>
+              </div>
+              <div style="margin-top: 12px" id="quickList"></div>
+            </div>
+
+            <div class="card">
+              <h2>Sales overview</h2>
+              <div class="form-row" style="margin: 8px 0">
+                <label class="muted" for="salesRange">Range</label>
+                <select id="salesRange">
+                  <option value="7">Last 7 days</option>
+                  <option value="30" selected>Last 30 days</option>
+                  <option value="90">Last 90 days</option>
+                </select>
+              </div>
+              <div class="charts">
+                <canvas id="salesChart" width="300" height="200" aria-label="Sales overview chart" role="img"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Inventory -->
+        <section id="view-inventory" style="display: none">
+          <div class="card">
+            <div class="flex space-between">
+              <h2>Medicines</h2>
+              <div class="controls">
+                <button type="button" class="btn small" id="addMedBtn">+ New medicine</button>
+                <input id="filterBySupplier" placeholder="Filter supplier" />
+              </div>
+            </div>
+
+            <div class="table-wrap" style="margin-top: 10px">
+              <table id="medTable">
+                <thead>
+                  <tr>
+                    <th class="sortable" data-sort="name">Name</th>
+                    <th>Batch</th>
+                    <th class="sortable" data-sort="supplier">Supplier</th>
+                    <th class="sortable" data-sort="qty">Qty</th>
+                    <th class="sortable" data-sort="expiry">Expiry</th>
+                    <th>Rating</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Low Stock -->
+        <section id="view-lowstock" style="display: none">
+          <div class="card">
+            <div class="flex space-between">
+              <h2>Low Stock Alerts</h2>
+              <div class="controls">
+                <label class="muted" for="lowStockThreshold">Threshold</label>
+                <input id="lowStockThreshold" type="number" min="1" style="width:100px" />
+                <button type="button" class="btn small" id="applyLowStockThreshold">Apply</button>
+
+                <!-- NEW: compose reorder -->
+                <select id="reorderSupplier" title="Compose for a specific supplier">
+                  <option value="">All suppliers</option>
+                </select>
+                <button type="button" class="btn small" id="reorderEmail">Email reorder</button>
+                <button type="button" class="btn small ghost" id="reorderWhatsApp">WhatsApp reorder</button>
+              </div>
+            </div>
+            <div class="muted" style="margin-top:6px">
+              Items at or below the threshold appear here. Use “Restock” to update on-hand quantity.
+            </div>
+
+            <div class="table-wrap" style="margin-top: 10px">
+              <table id="lowStockTable">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Batch</th>
+                    <th>Supplier</th>
+                    <th>Qty</th>
+                    <th>Suggested Reorder</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Expiry -->
+        <section id="view-expiry" style="display: none">
+          <div class="card">
+            <h2>Expiry Tracker</h2>
+            <div class="muted">Shows medicines expiring soon and already expired.</div>
+            <div class="table-wrap" style="margin-top: 10px">
+              <table id="expiryTable">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Batch</th>
+                    <th>Expiry</th>
+                    <th>Days left</th>
+                    <th>Qty</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Suppliers -->
+        <section id="view-suppliers" style="display: none">
+          <div class="card">
+            <div class="flex space-between">
+              <h2>Suppliers</h2>
+              <div class="controls">
+                <button type="button" class="btn small" id="addSupplierBtn">+ Supplier</button>
+              </div>
+            </div>
+
+            <div class="table-wrap" style="margin-top: 10px">
+              <table id="supTable">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Contact</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Sales (ENHANCED) -->
+        <section id="view-sales" style="display: none">
+          <div class="card">
+            <h2>Record Sales</h2>
+            <div id="saleRows" class="form-row" style="margin-top: 8px; flex-direction: column; gap: 8px"></div>
+            <div class="form-row">
+              <button type="button" class="btn small" id="addSaleRowBtn">+ Add item</button>
+              <button type="button" class="btn small" id="recordAllSalesBtn">Record all</button>
+              <span class="muted">Tip: use quick qty chips (1, 2, 5, 10) for tablets.</span>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top: 10px">
+            <h2>Sales Log</h2>
+            <div class="table-wrap" style="margin-top: 10px">
+              <table id="salesLog">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Medicine</th>
+                    <th>Qty</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Reports -->
+        <section id="view-reports" style="display: none">
+          <div class="card">
+            <h2>Reports</h2>
+
+            <div class="form-row" style="margin-top: 10px">
+              <input id="reportFrom" type="month" />
+              <input id="reportTo" type="month" />
+              <button type="button" class="btn small" id="applyRange">Apply range</button>
+              <button type="button" class="btn small ghost" id="clearRange">Clear</button>
+            </div>
+
+            <div class="cards" style="margin-top: 10px">
+              <div class="card">
+                <h2>Stock distribution</h2>
+                <canvas id="stockChart" width="300" height="220" aria-label="Stock distribution chart" role="img"></canvas>
+              </div>
+
+              <div class="card">
+                <h2>Expiry status</h2>
+                <canvas id="expiryChart" width="300" height="220" aria-label="Expiry status chart" role="img"></canvas>
+              </div>
+            </div>
+
+            <div class="cards" style="margin-top: 10px">
+              <div class="card" style="flex: 2">
+                <h2>Monthly sales (last 12 months)</h2>
+                <canvas id="monthlySalesChart" width="500" height="240" aria-label="Monthly sales chart" role="img"></canvas>
+              </div>
+
+              <div class="card">
+                <h2>Top products by revenue</h2>
+                <canvas id="productSalesChart" width="300" height="240" aria-label="Top products chart" role="img"></canvas>
+              </div>
+            </div>
+
+            <div class="cards" style="margin-top: 10px">
+              <div class="card">
+                <h2>Supplier share (₹)</h2>
+                <canvas id="supplierShareChart" width="300" height="220" aria-label="Supplier share chart" role="img"></canvas>
+              </div>
+
+              <div class="card">
+                <h2>KPIs</h2>
+                <div id="kpis" class="muted">
+                  <div>Gross sales in range: <strong id="kpiGross">₹ 0</strong></div>
+                  <div>Items expired (units): <strong id="kpiExpiredUnits">0</strong></div>
+                  <div>Stock value (est.): <strong id="kpiStockValue">₹ 0</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Settings -->
+        <section id="view-settings" style="display: none">
+          <div class="card">
+            <h2>Settings</h2>
+            <div class="muted">Local prototype settings.</div>
+
+            <div class="form-row" style="margin-top: 12px">
+              <button type="button" class="btn small" id="resetData">Reset data</button>
+              <button type="button" class="btn small ghost" id="seedData">Seed sample data</button>
+            </div>
+
+            <div class="notice" style="margin-top: 10px">
+              This prototype stores data in your browser's localStorage under key
+              <code>pharmacy_data_v1</code>.
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- Compose Message Modal -->
+    <div class="modal" id="composeModal" role="dialog" aria-modal="true" aria-labelledby="composeModalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="composeModalTitle">Reorder draft</h2>
+          <button type="button" class="btn small ghost" id="closeCompose">Close</button>
+        </div>
+        <textarea id="composeText" spellcheck="false"></textarea>
+        <div class="modal-actions">
+          <button type="button" class="btn small" id="copyCompose">Copy</button>
+          <button type="button" class="btn small" id="openEmailCompose">Open in Email</button>
+          <button type="button" class="btn small ghost" id="openWhatsAppCompose">Open in WhatsApp</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Medicine & Supplier Modals (unchanged UI placeholders) -->
+    <div class="modal" id="medModal" role="dialog" aria-modal="true" aria-labelledby="medModalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="medModalTitle">Add medicine</h2>
+          <button type="button" class="btn small ghost" id="closeMed">Close</button>
+        </div>
+
+        <div class="form-row">
+          <input id="medName" placeholder="Name" style="flex: 2" />
+          <input id="medBatch" placeholder="Batch" />
+        </div>
+
+        <div class="form-row">
+          <select id="medSupplier" style="flex: 2"></select>
+          <input id="medQty" type="number" min="0" placeholder="Quantity" />
+          <input id="medPrice" type="number" min="0" step="0.01" placeholder="Price" />
+        </div>
+
+        <div class="form-row">
+          <input id="medExpiry" type="date" />
+          <select id="medRating">
+            <option value="1">★</option>
+            <option value="2">★★</option>
+            <option value="3" selected>★★★</option>
+            <option value="4">★★★★</option>
+            <option value="5">★★★★★</option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn small ghost" id="deleteMedBtn" style="display: none">Delete</button>
+          <button type="button" class="btn small" id="saveMedBtn">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="supplierModal" role="dialog" aria-modal="true" aria-labelledby="supModalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="supModalTitle">Add supplier</h2>
+          <button type="button" class="btn small ghost" id="closeSup">Close</button>
+        </div>
+
+        <div class="form-row">
+          <input id="supName" placeholder="Name" style="flex: 2" />
+          <input id="supContact" placeholder="Contact" />
+        </div>
+
+        <div class="form-row">
+          <textarea id="supNotes" placeholder="Notes" style="flex: 1"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn small ghost" id="deleteSupBtn" style="display: none">Delete</button>
+          <button type="button" class="btn small" id="saveSupBtn">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
