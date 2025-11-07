@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>BliTZz Pharmacy</title>
+    <title>BliTZz  Pharmacy</title>
     <link rel="stylesheet" href="styles.css" />
     <!-- Charts -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
@@ -29,6 +29,7 @@
           <button type="button" data-view="lowstock" id="lowStockNav">Low Stock</button>
           <button type="button" data-view="expiry">Expiry</button>
           <button type="button" data-view="suppliers">Suppliers</button>
+          <button type="button" data-view="customers">Customers</button>
           <button type="button" data-view="sales">Sales</button>
           <button type="button" data-view="reports">Reports</button>
           <button type="button" data-view="settings">Settings</button>
@@ -113,6 +114,7 @@
                     <th class="sortable" data-sort="qty">Qty</th>
                     <th class="sortable" data-sort="expiry">Expiry</th>
                     <th>Rating</th>
+                    <th>Schedule</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -152,6 +154,7 @@
                     <th>Supplier</th>
                     <th>Qty</th>
                     <th>Suggested Reorder</th>
+                    <th>Schedule</th>
                     <th>Action</th>
                   </tr>
                 </thead>
@@ -175,6 +178,7 @@
                     <th>Expiry</th>
                     <th>Days left</th>
                     <th>Qty</th>
+                    <th>Schedule</th>
                     <th>Action</th>
                   </tr>
                 </thead>
@@ -210,10 +214,47 @@
           </div>
         </section>
 
-        <!-- Sales (ENHANCED) -->
+        <!-- Customers (CRM) -->
+        <section id="view-customers" style="display:none">
+          <div class="card">
+            <div class="flex space-between">
+              <h2>Customers</h2>
+              <div class="controls">
+                <button type="button" class="btn small" id="addCustomerBtn">+ Customer</button>
+                <input id="customerSearch" placeholder="Search by name/phone" />
+              </div>
+            </div>
+            <div class="table-wrap" style="margin-top:10px">
+              <table id="custTable">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Chronic</th>
+                    <th>Refill Cycle</th>
+                    <th>Last Purchase</th>
+                    <th>Next Refill</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Sales -->
         <section id="view-sales" style="display: none">
           <div class="card">
             <h2>Record Sales</h2>
+
+            <div class="form-row" style="margin-bottom:6px">
+              <label class="muted sale-med" for="saleCustomer">Customer</label>
+              <select id="saleCustomer" style="min-width:240px"></select>
+              <button type="button" class="btn small ghost" id="quickAddCustomer">+ Add</button>
+              <span class="badge crm" id="customerHint" style="display:none"></span>
+            </div>
+
             <div id="saleRows" class="form-row" style="margin-top: 8px; flex-direction: column; gap: 8px"></div>
             <div class="form-row">
               <button type="button" class="btn small" id="addSaleRowBtn">+ Add item</button>
@@ -229,9 +270,11 @@
                 <thead>
                   <tr>
                     <th>Date</th>
+                    <th>Customer</th>
                     <th>Medicine</th>
                     <th>Qty</th>
                     <th>Total</th>
+                    <th>Schedule / Rx</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -273,7 +316,7 @@
 
             <div class="cards" style="margin-top: 10px">
               <div class="card" style="flex: 2">
-                <h2>Monthly sales (last 12 months)</h2>
+                <h2>Monthly sales</h2>
                 <canvas id="monthlySalesChart" width="500" height="240" aria-label="Monthly sales chart" role="img"></canvas>
               </div>
 
@@ -322,84 +365,22 @@
     </div>
 
     <!-- Compose Message Modal -->
-    <div class="modal" id="composeModal" role="dialog" aria-modal="true" aria-labelledby="composeModalTitle">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h2 id="composeModalTitle">Reorder draft</h2>
-          <button type="button" class="btn small ghost" id="closeCompose">Close</button>
-        </div>
-        <textarea id="composeText" spellcheck="false"></textarea>
-        <div class="modal-actions">
-          <button type="button" class="btn small" id="copyCompose">Copy</button>
-          <button type="button" class="btn small" id="openEmailCompose">Open in Email</button>
-          <button type="button" class="btn small ghost" id="openWhatsAppCompose">Open in WhatsApp</button>
-        </div>
-      </div>
+<div class="modal" id="composeModal" role="dialog" aria-modal="true" aria-labelledby="composeModalTitle">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="composeModalTitle">Reorder draft</h2>
+      <button type="button" class="btn small ghost" id="closeCompose">Close</button>
     </div>
 
-    <!-- Medicine & Supplier Modals (placeholders) -->
-    <div class="modal" id="medModal" role="dialog" aria-modal="true" aria-labelledby="medModalTitle">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h2 id="medModalTitle">Add medicine</h2>
-          <button type="button" class="btn small ghost" id="closeMed">Close</button>
-        </div>
+    <textarea id="composeText" spellcheck="false" placeholder="Type your message..."></textarea>
 
-        <div class="form-row">
-          <input id="medName" placeholder="Name" style="flex: 2" />
-          <input id="medBatch" placeholder="Batch" />
-        </div>
-
-        <div class="form-row">
-          <select id="medSupplier" style="flex: 2"></select>
-          <input id="medQty" type="number" min="0" placeholder="Quantity" />
-          <input id="medPrice" type="number" min="0" step="0.01" placeholder="Price" />
-        </div>
-
-        <div class="form-row">
-          <input id="medExpiry" type="date" />
-          <select id="medRating">
-            <option value="1">★</option>
-            <option value="2">★★</option>
-            <option value="3" selected>★★★</option>
-            <option value="4">★★★★</option>
-            <option value="5">★★★★★</option>
-          </select>
-          <!-- NEW: Controlled drug flag (optional UI) -->
-          <label class="muted" style="display:flex;align-items:center;gap:6px">
-            <input id="medControlled" type="checkbox" /> Controlled drug
-          </label>
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn small ghost" id="deleteMedBtn" style="display: none">Delete</button>
-          <button type="button" class="btn small" id="saveMedBtn">Save</button>
-        </div>
-      </div>
+    <div class="modal-actions">
+      <button type="button" class="btn small" id="copyCompose">Copy</button>
+      <button type="button" class="btn small" id="openEmailCompose">Open in Email</button>
+      <button type="button" class="btn small ghost" id="openWhatsAppCompose">Open in WhatsApp</button>
     </div>
-
-    <div class="modal" id="supplierModal" role="dialog" aria-modal="true" aria-labelledby="supModalTitle">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h2 id="supModalTitle">Add supplier</h2>
-          <button type="button" class="btn small ghost" id="closeSup">Close</button>
-        </div>
-
-        <div class="form-row">
-          <input id="supName" placeholder="Name" style="flex: 2" />
-          <input id="supContact" placeholder="Contact" />
-        </div>
-
-        <div class="form-row">
-          <textarea id="supNotes" placeholder="Notes" style="flex: 1"></textarea>
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn small ghost" id="deleteSupBtn" style="display: none">Delete</button>
-          <button type="button" class="btn small" id="saveSupBtn">Save</button>
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
 
     <script src="script.js"></script>
   </body>
