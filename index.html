@@ -137,8 +137,8 @@
                 <select id="reorderSupplier" title="Compose for a specific supplier">
                   <option value="">All suppliers</option>
                 </select>
-                <button type="button" class="btn small" id="reorderEmail">Email reorder</button>
-                <button type="button" class="btn small ghost" id="reorderWhatsApp">WhatsApp reorder</button>
+                <button type="button" class="btn small" id="reorderEmail" data-open-compose>Email reorder</button>
+                <button type="button" class="btn small ghost" id="reorderWhatsApp" data-open-compose>WhatsApp reorder</button>
               </div>
             </div>
             <div class="muted" style="margin-top:6px">
@@ -249,7 +249,7 @@
             <h2>Record Sales</h2>
 
             <div class="form-row" style="margin-bottom:6px">
-              <label class="muted sale-med" for="saleCustomer">Customer</label>
+              <label class="muted" for="saleCustomer">Customer</label>
               <select id="saleCustomer" style="min-width:240px"></select>
               <button type="button" class="btn small ghost" id="quickAddCustomer">+ Add</button>
               <span class="badge crm" id="customerHint" style="display:none"></span>
@@ -365,22 +365,22 @@
     </div>
 
     <!-- Compose Message Modal -->
-<div class="modal" id="composeModal" role="dialog" aria-modal="true" aria-labelledby="composeModalTitle">
-  <div class="modal-card">
-    <div class="modal-header">
-      <h2 id="composeModalTitle">Reorder draft</h2>
-      <button type="button" class="btn small ghost" id="closeCompose">Close</button>
-    </div>
+    <div class="modal" id="composeModal" role="dialog" aria-modal="true" aria-labelledby="composeModalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="composeModalTitle">Reorder draft</h2>
+          <button type="button" class="btn small ghost" id="closeCompose">Close</button>
+        </div>
 
-    <textarea id="composeText" spellcheck="false" placeholder="Type your message..."></textarea>
+        <textarea id="composeText" spellcheck="false" placeholder="Type your message..."></textarea>
 
-    <div class="modal-actions">
-      <button type="button" class="btn small" id="copyCompose">Copy</button>
-      <button type="button" class="btn small" id="openEmailCompose">Open in Email</button>
-      <button type="button" class="btn small ghost" id="openWhatsAppCompose">Open in WhatsApp</button>
+        <div class="modal-actions">
+          <button type="button" class="btn small" id="copyCompose">Copy</button>
+          <button type="button" class="btn small" id="openEmailCompose">Open in Email</button>
+          <button type="button" class="btn small ghost" id="openWhatsAppCompose">Open in WhatsApp</button>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
     <script src="script.js"></script>
   </body>

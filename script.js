@@ -1,4 +1,3 @@
-
 // ---------- Data layer (localStorage) ----------
 const STORAGE_KEY = "pharmacy_data_v1";
 
@@ -34,6 +33,88 @@ function loadState() {
 
 // Generate simple ID
 function id(prefix = "id") { return prefix + "_" + Math.random().toString(36).slice(2, 9); }
+
+// ---------- Animations & UI theming (new) ----------
+function injectAnimationsCSS() {
+  if (document.getElementById("animStyles")) return;
+  const style = document.createElement("style");
+  style.id = "animStyles";
+  style.textContent = `
+    .anim-enter{opacity:0; transform:translateY(6px) scale(.98); transition:opacity .28s ease, transform .28s ease;}
+    .anim-enter.in{opacity:1; transform:none;}
+    .anim-pop{opacity:0; transform:scale(.98); transition:opacity .22s ease, transform .22s ease;}
+    .anim-pop.in{opacity:1; transform:scale(1);}
+    .highlight{animation:flash 1.2s ease-in-out 1;}
+    @keyframes flash{
+      0%{ background-color:rgba(6,182,212,.10); }
+      60%{ background-color:transparent; }
+      100%{ background-color:transparent; }
+    }
+    .toast{
+      position:fixed; left:50%; transform:translate(-50%, 10px);
+      bottom:20px; background:rgba(4,32,38,.92);
+      border:1px solid rgba(255,255,255,.09); color:#e6eef6;
+      padding:10px 14px; border-radius:10px; z-index:1000;
+      opacity:0; transition:opacity .25s ease, transform .25s ease;
+      backdrop-filter: blur(6px);
+    }
+    .toast.show{opacity:1; transform:translate(-50%, 0);}
+  `;
+  document.head.appendChild(style);
+}
+injectAnimationsCSS();
+
+function animateEnter(el, variant = "enter") {
+  if (!el) return;
+  const cls = variant === "pop" ? "anim-pop" : "anim-enter";
+  el.classList.add(cls);
+  // force reflow
+  void el.offsetWidth;
+  el.classList.add("in");
+  setTimeout(() => el.classList.remove(cls, "in"), 450);
+}
+
+function highlight(el) {
+  if (!el) return;
+  el.classList.add("highlight");
+  setTimeout(() => el.classList.remove("highlight"), 1200);
+}
+
+function showToast(msg = "Done") {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  // enter
+  requestAnimationFrame(() => t.classList.add("show"));
+  // leave
+  setTimeout(() => {
+    t.classList.remove("show");
+    setTimeout(() => t.remove(), 300);
+  }, 1500);
+}
+
+/** Make all selects use the same theme as the medicine selector. */
+function themifySelects(root = document) {
+  root.querySelectorAll("select:not(.sale-med)").forEach(sel => {
+    sel.classList.add("sale-med");
+  });
+}
+
+/** Stagger-in first few table rows for a soft entrance. */
+function animateTableRows(tbody) {
+  if (!tbody) return;
+  const rows = Array.from(tbody.children).slice(0, 20);
+  rows.forEach((r, i) => {
+    r.style.willChange = "transform,opacity";
+    r.classList.add("anim-enter");
+    setTimeout(() => r.classList.add("in"), i * 18);
+    setTimeout(() => {
+      r.classList.remove("anim-enter", "in");
+      r.style.willChange = "";
+    }, 600 + i * 18);
+  });
+}
 
 // ---------- Sample seed data ----------
 function seedSample() {
@@ -92,6 +173,7 @@ function seedSample() {
   };
   saveState();
   renderAll();
+  showToast("Sample data added");
 }
 
 // ---------- Utilities ----------
@@ -120,14 +202,17 @@ function showView(view) {
   updateSummaries();
 }
 
+// Minimal renderAll in case it's missing elsewhere
+function renderAll() { updateSummaries(); }
+
 function updateSummaries() {
   const threshold = getThreshold();
 
   // inventory summary
   const totalItems = state.medicines.reduce((s, m) => s + (m.qty || 0), 0);
   const lowStock = state.medicines.filter((m) => (m.qty || 0) <= threshold).length;
-  document.getElementById("summaryInventory").innerText =
-    `${state.medicines.length} SKUs — ${totalItems} units in stock. ${lowStock} item(s) low stock.`;
+  const inv = document.getElementById("summaryInventory");
+  if (inv) inv.innerText = `${state.medicines.length} SKUs — ${totalItems} units in stock. ${lowStock} item(s) low stock.`;
 
   // Low Stock nav count
   const lowNav = document.getElementById("lowStockNav");
@@ -136,14 +221,16 @@ function updateSummaries() {
   // expiry summary
   const soon = state.medicines.filter((m) => daysUntil(m.expiry) <= 14 && daysUntil(m.expiry) >= 0).length;
   const expired = state.medicines.filter((m) => daysUntil(m.expiry) < 0).length;
-  document.getElementById("summaryExpiry").innerText = `${soon} expiring within 14 days, ${expired} already expired.`;
+  const ex = document.getElementById("summaryExpiry");
+  if (ex) ex.innerText = `${soon} expiring within 14 days, ${expired} already expired.`;
 
   // sales summary for today
   const today = new Date().toISOString().slice(0, 10);
   const todaysSales = state.sales
     .filter((s) => s.date.slice(0, 10) === today)
     .reduce((sum, x) => sum + (x.total || 0), 0);
-  document.getElementById("summarySales").innerText = `₹ ${todaysSales.toFixed(2)} today.`;
+  const ss = document.getElementById("summarySales");
+  if (ss) ss.innerText = `₹ ${todaysSales.toFixed(2)} today.`;
 
   renderQuickList();
   renderMedTable();
@@ -186,12 +273,16 @@ function updateSummaries() {
     sc.value = old || "";
     showCustomerHint();
   }
+
+  // NEW: make all selects themed after each refresh
+  themifySelects();
 }
 
 function renderQuickList() {
-  const q = (document.getElementById("quickSearch").value || "").toLowerCase();
+  const q = (document.getElementById("quickSearch")?.value || "").toLowerCase();
   const list = state.medicines.filter((m) => m.name.toLowerCase().includes(q)).slice(0, 8);
   const target = document.getElementById("quickList");
+  if (!target) return;
   target.innerHTML =
     list.map((m) =>
       `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,0.02)">
@@ -203,13 +294,12 @@ function renderQuickList() {
       </div>`
     ).join("") || '<div class="muted">No matches</div>';
 }
-
 function renderMedTable() {
   const tbody = document.querySelector("#medTable tbody");
   if (!tbody) return;
   tbody.innerHTML = "";
   const supplierMap = Object.fromEntries(state.suppliers.map((s) => [s.id, s.name]));
-  const filter = (document.getElementById("filterBySupplier").value || "").toLowerCase();
+  const filter = (document.getElementById("filterBySupplier")?.value || "").toLowerCase();
 
   state.medicines
     .filter((m) => !filter || (supplierMap[m.supplierId] || "").toLowerCase().includes(filter))
@@ -231,6 +321,8 @@ function renderMedTable() {
         </td>`;
       tbody.appendChild(tr);
     });
+
+  animateTableRows(tbody);
 }
 
 function renderLowStockTable() {
@@ -248,6 +340,7 @@ function renderLowStockTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td colspan="7" class="muted">All good! No items at or below ${threshold} units.</td>`;
     tbody.appendChild(tr);
+    animateTableRows(tbody);
     return;
   }
 
@@ -264,6 +357,8 @@ function renderLowStockTable() {
       <td><button class="btn small" onclick="restockMed('${m.id}', ${suggested})">Restock</button></td>`;
     tbody.appendChild(tr);
   });
+
+  animateTableRows(tbody);
 }
 
 function renderExpiryTable() {
@@ -286,6 +381,7 @@ function renderExpiryTable() {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td colspan="7" class="muted">No items expiring within 30 days, and none expired.</td>`;
       tbody.appendChild(tr);
+      animateTableRows(tbody);
       return;
   }
 
@@ -306,6 +402,8 @@ function renderExpiryTable() {
       </td>`;
       tbody.appendChild(tr);
   }
+
+  animateTableRows(tbody);
 }
 
 // ---------- Suppliers ----------
@@ -325,6 +423,7 @@ function renderSuppliers() {
       </td>`;
     tbody.appendChild(tr);
   });
+  animateTableRows(tbody);
 }
 
 // ---------- Customers (CRM) ----------
@@ -366,6 +465,7 @@ function renderCustomers(){
       </td>`;
     tbody.appendChild(tr);
   });
+  animateTableRows(tbody);
 }
 function renderDueReminders(){
   const tbody = document.querySelector("#dueTable tbody");
@@ -379,6 +479,7 @@ function renderDueReminders(){
     const tr=document.createElement("tr");
     tr.innerHTML = `<td colspan="5" class="muted">No customers due in the next 3 days.</td>`;
     tbody.appendChild(tr);
+    animateTableRows(tbody);
     return;
   }
   dueList.sort((a,b)=> new Date(a.due)-new Date(b.due)).forEach(({c,due})=>{
@@ -394,6 +495,7 @@ function renderDueReminders(){
       </td>`;
     tbody.appendChild(tr);
   });
+  animateTableRows(tbody);
 }
 function renderPendingRx(){
   const tbody = document.querySelector("#pendingRxTable tbody");
@@ -430,6 +532,7 @@ function renderPendingRx(){
     const tr=document.createElement("tr");
     tr.innerHTML = `<td colspan="6" class="muted">No pending prescriptions 🎉</td>`;
     tbody.appendChild(tr);
+    animateTableRows(tbody);
     return;
   }
   pending.sort((a,b)=> new Date(b.date)-new Date(a.date)).forEach(p=>{
@@ -449,6 +552,7 @@ function renderPendingRx(){
       </td>`;
     tbody.appendChild(tr);
   });
+  animateTableRows(tbody);
 }
 function addCustomer(){
   const name = prompt("Customer name"); if (!name) return;
@@ -458,6 +562,7 @@ function addCustomer(){
   const refillDays = Number(prompt("Refill cycle (days)", "30")) || 30;
   state.customers.push({ id:id("c"), name, phone, notes:"", chronic, conditions, refillDays, lastPurchaseISO:null });
   saveState(); renderAll();
+  showToast("Customer added");
 }
 function editCustomer(id){
   const c = state.customers.find(x=>x.id===id); if(!c) return;
@@ -468,6 +573,7 @@ function editCustomer(id){
   const chronic = prompt("Chronic? (y/n)", c.chronic?"y":"n"); if (chronic!=null) c.chronic = /^y/i.test(chronic);
   const rd = Number(prompt("Refill days", c.refillDays||30)); if (rd) c.refillDays = rd;
   saveState(); renderAll();
+  showToast("Customer updated");
 }
 function deleteCustomer(id){
   if (!confirm("Delete customer?")) return;
@@ -475,6 +581,7 @@ function deleteCustomer(id){
   // keep sales history but detach
   state.sales = state.sales.map(s=> s.customerId===id ? {...s, customerId: ""} : s);
   saveState(); renderAll();
+  showToast("Customer deleted");
 }
 function sendReminder(customerId, type='whatsapp'){
   const c = state.customers.find(x=>x.id===customerId); if(!c) return alert("Customer not found");
@@ -556,6 +663,11 @@ function makeSaleRow(defaultQty = 1) {
     row.querySelector(".sale-qty").value = chip.dataset.q;
   }));
   row.querySelector(".remove-line").addEventListener("click", () => { row.remove(); });
+
+  // NEW: soft entrance animation and ensure themed selects
+  animateEnter(row, "pop");
+  themifySelects(row);
+
   return row;
 }
 
@@ -573,7 +685,9 @@ function showCustomerHint(){
 function renderSalesUI() {
   const container = document.getElementById("saleRows");
   if (container && container.querySelectorAll(".sale-line").length === 0) {
-    container.appendChild(makeSaleRow(1));
+    const r = makeSaleRow(1);
+    container.appendChild(r);
+    animateEnter(r, "pop");
   }
   const tbody = document.querySelector("#salesLog tbody");
   if (!tbody) return;
@@ -594,6 +708,7 @@ function renderSalesUI() {
       <td>${rxInfo}</td>`;
     tbody.appendChild(tr);
   });
+  animateTableRows(tbody);
 }
 
 // ---------- Edit / CRUD for meds & suppliers ----------
@@ -609,11 +724,13 @@ function openEditMed(id) {
   m.schedule = /^(OTC|H|H1|X)$/i.test(schedule) ? schedule.toUpperCase() : m.schedule;
   saveState();
   renderAll();
+  showToast("Medicine updated");
 }
 function deleteMed(id) {
   if (!confirm("Delete this medicine?")) return;
   state.medicines = state.medicines.filter((m) => m.id !== id);
   saveState(); renderAll();
+  showToast("Medicine deleted");
 }
 function promoteMed(id) { alert("Marking as promotional — consider discounting or placing on front shelf."); }
 function addNewMedicine() {
@@ -628,6 +745,7 @@ function addNewMedicine() {
   const med = { id: id("m"), name, batch, supplierId: supplier, qty, expiry, rating, price, schedule: /^(OTC|H|H1|X)$/.test(schedule) ? schedule : 'OTC' };
   state.medicines.push(med);
   saveState(); renderAll();
+  showToast("Medicine added");
 }
 function addSupplier() {
   const name = prompt("Supplier name"); if (!name) return;
@@ -635,6 +753,7 @@ function addSupplier() {
   const notes = prompt("Notes") || "";
   state.suppliers.push({ id: id("s"), name, contact, notes });
   saveState(); renderAll();
+  showToast("Supplier added");
 }
 function editSupplier(id) {
   const s = state.suppliers.find((x) => x.id === id);
@@ -644,11 +763,13 @@ function editSupplier(id) {
   s.contact = prompt("Contact", s.contact) || s.contact;
   s.notes = prompt("Notes", s.notes) || s.notes;
   saveState(); renderAll();
+  showToast("Supplier updated");
 }
 function deleteSupplier(id) {
   if (!confirm("Delete supplier? This does not remove medicines.")) return;
   state.suppliers = state.suppliers.filter((s) => s.id !== id);
   saveState(); renderAll();
+  showToast("Supplier deleted");
 }
 
 // ---------- Restock / Disposal ----------
@@ -659,7 +780,8 @@ function restockMed(medId, suggested) {
   if (qty <= 0) return;
   med.qty = (med.qty || 0) + qty;
   state.purchases.push({ date: new Date().toISOString(), supplierId: med.supplierId || "", items: [{ medId: med.id, batch: med.batch, qty, price: med.price || 0 }] });
-  saveState(); renderAll(); alert(`Restocked ${qty} units of ${med.name}.`);
+  saveState(); renderAll();
+  showToast(`Restocked ${qty} units`);
 }
 function disposeMedicine(medId) {
   const med = state.medicines.find(m => m.id === medId);
@@ -669,7 +791,8 @@ function disposeMedicine(medId) {
   const reason = prompt("Reason (expired/damaged/recall):", "expired") || "expired";
   med.qty -= qty;
   state.disposals.push({ date: new Date().toISOString(), medId: med.id, batch: med.batch, qty, reason });
-  saveState(); renderAll(); alert(`Disposed ${qty} units of ${med.name}.`);
+  saveState(); renderAll();
+  showToast(`Disposed ${qty} units`);
 }
 
 // ---------- Sales recording (validates Rx; attaches customer; updates lastPurchase) ----------
@@ -734,20 +857,27 @@ function recordAllSales() {
 
   const container = document.getElementById("saleRows");
   container.innerHTML = "";
-  container.appendChild(makeSaleRow(1));
+  const nr = makeSaleRow(1);
+  container.appendChild(nr);
+  animateEnter(nr, "pop");
+
   renderAll();
   showView("sales");
-  alert(`Recorded ${totalLines} line(s) of sale.`);
-}
 
-// ---------- Charts & KPIs (unchanged core logic) ----------
+  // NEW: highlight the just-added sales row in the log
+  const first = document.querySelector("#salesLog tbody tr");
+  if (first) highlight(first);
+
+  showToast(`Recorded ${totalLines} line(s)`);
+}
+// ---------- Charts & KPIs ----------
 let salesChart, stockChart, expiryChart, monthlySalesChart, productSalesChart, supplierShareChart;
 function groupSalesByMonth(sales) {
   const map = new Map();
   sales.forEach((s) => { const d = new Date(s.date); const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; map.set(key, (map.get(key) || 0) + (s.total || 0)); });
   return map;
 }
-function lastNMonths(n) { const arr = []; const d = new Date(); d.setDate(1); for (let i=n-1;i>=0;i--){ const dt=new Date(d); dt.setMonth(d.getMonth()-i); arr.push(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`);} return arr; }
+function lastNMonths(n) { const arr = []; const d = new Date(); d.setDate(1); for (let i=n-1;i>=0;i--){ const dt=new Date(d); dt.setMonth(dt.getMonth()-i); arr.push(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`);} return arr; }
 function monthLabel(ym) { const [y, m] = ym.split("-"); return new Date(Number(y), Number(m)-1, 1).toLocaleString(undefined, { month: "short", year: "2-digit" }); }
 function inRange(dateIso) {
   const from = document.getElementById("reportFrom")?.value;
@@ -770,9 +900,11 @@ function renderCharts() {
     const sum = state.sales.filter((s) => s.date.slice(0, 10) === key).reduce((a, b) => a + b.total, 0);
     data.push(Number(sum.toFixed(2)));
   }
-  const ctx = document.getElementById("salesChart").getContext("2d");
-  if (salesChart) salesChart.destroy();
-  salesChart = new Chart(ctx, { type: "line", data: { labels, datasets: [{ label: "Revenue (₹)", data, tension: 0.3 }] }, options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } } });
+  const ctx = document.getElementById("salesChart")?.getContext("2d");
+  if (ctx){
+    if (salesChart) salesChart.destroy();
+    salesChart = new Chart(ctx, { type: "line", data: { labels, datasets: [{ label: "Revenue (₹)", data, tension: 0.3 }] }, options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } } });
+  }
 
   const top = state.medicines.slice().sort((a, b) => b.qty - a.qty).slice(0, 6);
   const ctx2 = document.getElementById("stockChart")?.getContext("2d");
@@ -809,11 +941,14 @@ function renderCharts() {
   if (ctx6) { if (supplierShareChart) supplierShareChart.destroy(); supplierShareChart = new Chart(ctx6, { type: "pie", data: { labels: supLabels, datasets: [{ data: supValues }] }, options: { plugins: { legend: { position: "bottom" } } } }); }
 
   const gross = state.sales.filter((s) => inRange(s.date)).reduce((a, b) => a + (b.total || 0), 0);
-  document.getElementById("kpiGross").innerText = `₹ ${gross.toFixed(2)}`;
+  const k1 = document.getElementById("kpiGross");
+  if (k1) k1.innerText = `₹ ${gross.toFixed(2)}`;
   const expiredUnits = state.medicines.filter((m) => daysUntil(m.expiry) < 0).reduce((a, b) => a + (b.qty || 0), 0);
-  document.getElementById("kpiExpiredUnits").innerText = String(expiredUnits);
+  const k2 = document.getElementById("kpiExpiredUnits");
+  if (k2) k2.innerText = String(expiredUnits);
   const stockValue = state.medicines.reduce((a, b) => a + (b.qty || 0) * (b.price || 0), 0);
-  document.getElementById("kpiStockValue").innerText = `₹ ${stockValue.toFixed(2)}`;
+  const k3 = document.getElementById("kpiStockValue");
+  if (k3) k3.innerText = `₹ ${stockValue.toFixed(2)}`;
 }
 
 // ---------- Export / Import ----------
@@ -825,6 +960,7 @@ function exportJSON() {
   a.download = "pharmacy_data.json";
   a.click();
   URL.revokeObjectURL(url);
+  showToast("Exported JSON");
 }
 function importJSONFile(file) {
   const reader = new FileReader();
@@ -839,7 +975,7 @@ function importJSONFile(file) {
       parsed.customers = parsed.customers || [];
       parsed.compliance = parsed.compliance || { scheduleXRegister: [] };
       (parsed.medicines || []).forEach(m => { if (!m.schedule) m.schedule = m.controlled ? 'X' : 'OTC'; });
-      state = parsed; saveState(); renderAll(); alert("Imported");
+      state = parsed; saveState(); renderAll(); showToast("Imported data");
     } catch { alert("Invalid file"); }
   };
   reader.readAsText(file);
@@ -1011,6 +1147,7 @@ function exportAuditExcel() {
     a.href = URL.createObjectURL(blob);
     a.download = `Audit_CRM_${safeDate()}.xlsx`;
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+    showToast("Excel exported");
   } catch (e) { console.error(e); alert("Excel export failed. See console for details."); }
 }
 
@@ -1052,6 +1189,7 @@ async function exportAuditPDF() {
   line(`Version: ${audit.meta.version}`, y);
 
   doc.save(`Audit_CRM_${new Date().toISOString().slice(0,10)}.pdf`);
+  showToast("PDF exported");
 }
 
 async function signAuditJSON() {
@@ -1065,67 +1203,61 @@ async function signAuditJSON() {
   const saveBlob = async (name, obj) => { const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href); };
   await saveBlob(`Audit_${new Date().toISOString().slice(0,10)}.json`, audit);
   await saveBlob(`Audit_${new Date().toISOString().slice(0,10)}.sig.json`, sigBundle);
-  alert('Signed JSON and signature exported.');
+  showToast("Signed JSON exported");
 }
 
 // ---------- Cloud Backup (optional) ----------
 const firebaseConfig = { apiKey: "YOUR_API_KEY", authDomain: "your-app.firebaseapp.com", databaseURL: "https://your-app-default-rtdb.firebaseio.com", projectId: "your-app", appId: "YOUR_APP_ID" };
 try { if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); firebase.auth().signInAnonymously().catch(()=>{}); } } catch(e){}
 
-async function backupToCloud() {
-  try {
-    const user = firebase.auth().currentUser;
-    if (!user) { alert('Cloud not configured or login failed.'); return; }
-    const ref = firebase.database().ref(`pharmacies/${user.uid}/backups`).push();
-    await ref.set({ createdAt: Date.now(), payload: state });
-    alert('Backup complete in cloud.');
-  } catch (e) { alert('Cloud backup failed. Configure Firebase keys in the code.'); }
-}
-
 // ---------- Event bindings ----------
-document.getElementById("quickSearch").addEventListener("input", renderQuickList);
-document.getElementById("filterBySupplier").addEventListener("input", renderMedTable);
-document.getElementById("addMedQuick").addEventListener("click", addNewMedicine);
-document.getElementById("addMedBtn").addEventListener("click", addNewMedicine);
-document.getElementById("addSupplierBtn").addEventListener("click", addSupplier);
+document.getElementById("quickSearch")?.addEventListener("input", renderQuickList);
+document.getElementById("filterBySupplier")?.addEventListener("input", renderMedTable);
+document.getElementById("addMedQuick")?.addEventListener("click", addNewMedicine);
+document.getElementById("addMedBtn")?.addEventListener("click", addNewMedicine);
+document.getElementById("addSupplierBtn")?.addEventListener("click", addSupplier);
 
 // Customers
-document.getElementById("addCustomerBtn").addEventListener("click", addCustomer);
-document.getElementById("customerSearch").addEventListener("input", renderCustomers);
+document.getElementById("addCustomerBtn")?.addEventListener("click", addCustomer);
+document.getElementById("customerSearch")?.addEventListener("input", renderCustomers);
 
 // sales: rows and record
-document.getElementById("addSaleRowBtn").addEventListener("click", () => {
-  document.getElementById("saleRows").appendChild(makeSaleRow(2));
+document.getElementById("addSaleRowBtn")?.addEventListener("click", () => {
+  const row = makeSaleRow(2);
+  const wrap = document.getElementById("saleRows");
+  if (wrap){ wrap.appendChild(row); animateEnter(row, "pop"); }
 });
-document.getElementById("recordAllSalesBtn").addEventListener("click", recordAllSales);
-document.getElementById("quickAddCustomer").addEventListener("click", addCustomer);
-document.getElementById("saleCustomer").addEventListener("change", showCustomerHint);
+document.getElementById("recordAllSalesBtn")?.addEventListener("click", recordAllSales);
+document.getElementById("quickAddCustomer")?.addEventListener("click", addCustomer);
+document.getElementById("saleCustomer")?.addEventListener("change", showCustomerHint);
 
 // file import/export
-document.getElementById("exportBtn").addEventListener("click", exportJSON);
-document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
-document.getElementById("importFile").addEventListener("change", (e) => importJSONFile(e.target.files[0]));
+document.getElementById("exportBtn")?.addEventListener("click", exportJSON);
+document.getElementById("importBtn")?.addEventListener("click", () => document.getElementById("importFile").click());
+document.getElementById("importFile")?.addEventListener("change", (e) => importJSONFile(e.target.files[0]));
 
 // data reset/seed
-document.getElementById("resetData").addEventListener("click", () => {
+document.getElementById("resetData")?.addEventListener("click", () => {
   if (confirm("Reset all data?")) {
     state = { medicines: [], suppliers: [], customers: [], sales: [], purchases: [], disposals: [], controlledLogs: [], gstInvoices: [], compliance: { scheduleXRegister: [] }, settings: { lowStockThreshold: 30 } };
     saveState(); renderAll();
+    showToast("All data cleared");
   }
 });
-document.getElementById("seedData").addEventListener("click", () => { if (confirm("Seed sample data?")) seedSample(); });
+document.getElementById("seedData")?.addEventListener("click", () => { if (confirm("Seed sample data?")) seedSample(); });
 
 // promote soon
-document.getElementById("promoSoon").addEventListener("click", () => {
+document.getElementById("promoSoon")?.addEventListener("click", () => {
   const list = state.medicines.filter((m) => daysUntil(m.expiry) <= 14 && daysUntil(m.expiry) >= 0);
   if (!list.length) return alert("No items expiring within 14 days");
   alert("Consider promoting these: " + list.map((x) => x.name).join(", "));
 });
 
 // go to low stock from dashboard
-document.getElementById("gotoLowStock").addEventListener("click", () => {
+document.getElementById("gotoLowStock")?.addEventListener("click", () => {
   document.querySelectorAll("#mainNav button").forEach((b) => b.classList.remove("active"));
-  document.querySelector('#mainNav button[data-view="lowstock"]').classList.add("active");
+  const btn = document.querySelector('#mainNav button[data-view="lowstock"]');
+  btn?.classList.add("active");
   showView("lowstock");
 });
 
@@ -1143,23 +1275,26 @@ const applyRangeBtn = document.getElementById("applyRange");
 const clearRangeBtn = document.getElementById("clearRange");
 if (applyRangeBtn) applyRangeBtn.addEventListener("click", () => renderCharts());
 if (clearRangeBtn) clearRangeBtn.addEventListener("click", () => {
-  document.getElementById("reportFrom").value = "";
-  document.getElementById("reportTo").value = "";
+  const rf = document.getElementById("reportFrom");
+  const rt = document.getElementById("reportTo");
+  if (rf) rf.value = "";
+  if (rt) rt.value = "";
   renderCharts();
 });
 
 // Low stock threshold and reorder actions
-document.getElementById("applyLowStockThreshold").addEventListener("click", () => {
+document.getElementById("applyLowStockThreshold")?.addEventListener("click", () => {
   const val = Number(document.getElementById("lowStockThreshold").value) || 1;
   state.settings.lowStockThreshold = Math.max(1, Math.floor(val));
   saveState(); renderAll();
+  showToast("Threshold applied");
 });
 
 // Audit buttons
-document.getElementById('exportAuditExcel').addEventListener('click', exportAuditExcel);
-document.getElementById('exportAuditPDF').addEventListener('click', exportAuditPDF);
-document.getElementById('auditSignJSON').addEventListener('click', signAuditJSON);
-document.getElementById('backupToCloud').addEventListener('click', backupToCloud);
+document.getElementById('exportAuditExcel')?.addEventListener('click', exportAuditExcel);
+document.getElementById('exportAuditPDF')?.addEventListener('click', exportAuditPDF);
+document.getElementById('auditSignJSON')?.addEventListener('click', signAuditJSON);
+document.getElementById('backupToCloud')?.addEventListener('click', backupToCloud);
 
 // expose some globals
 window.editCustomer = editCustomer;
@@ -1173,86 +1308,92 @@ window.deleteSupplier = deleteSupplier;
 window.restockMed = restockMed;
 window.disposeMedicine = disposeMedicine;
 
-// init
-renderNav();
-loadState();
-if (!state.medicines.length && !state.suppliers.length && !state.customers.length) seedSample();
-renderAll();
-(() => {
-  const modal = document.getElementById('composeModal');
-  const txt = document.getElementById('composeText');
-  const btnClose = document.getElementById('closeCompose');
-  const btnCopy = document.getElementById('copyCompose');
-  const btnEmail = document.getElementById('openEmailCompose');
-  const btnWA = document.getElementById('openWhatsAppCompose');
+// ---------- Fast, no-delay boot (fixes “need to click nav to see data”) ----------
+(function immediateBoot(){
+  // Remove any splash/loading blockers if present
+  document.getElementById('appLoader')?.remove();
+  document.querySelector('.splash')?.remove();
+  document.querySelector('.loader')?.remove();
+  document.querySelector('.preload')?.remove();
+  document.documentElement.classList.remove('loading','is-loading');
+  document.body?.classList?.remove('loading','is-loading');
 
-  function openCompose(initialText = '') {
-    if (typeof initialText === 'string') txt.value = initialText;
-    modal.classList.add('open');
-    modal.removeAttribute('aria-hidden');
-    // trap scroll
-    document.documentElement.style.overflow = 'hidden';
-    // focus text area
-    setTimeout(() => txt.focus(), 0);
+  // Make sure nav works
+  renderNav();
+
+  // Load or seed
+  loadState();
+  if (!state.medicines.length && !state.suppliers.length && !state.customers.length) {
+    // Seed and render right away
+    seedSample(); // seedSample calls renderAll() internally
+  } else {
+    // Force show Dashboard FIRST so widgets/DOM exist before rendering
+    const dashBtn = document.querySelector('#mainNav button[data-view="dashboard"]');
+    if (dashBtn) dashBtn.classList.add('active');
+    showView('dashboard'); // <<< ensure dashboard visible immediately
+    renderAll();          // then render summaries/charts/tables
   }
 
-  function closeCompose() {
-    modal.classList.remove('open');
-    modal.setAttribute('aria-hidden', 'true');
-    document.documentElement.style.overflow = '';
-  }
+  // Theme selects now
+  themifySelects();
 
-  // Close handlers
-  btnClose?.addEventListener('click', closeCompose);
-  // Click outside the card closes
-  modal.addEventListener('click', e => {
-    if (e.target === modal) closeCompose();
-  });
-  // ESC to close
-  window.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && modal.classList.contains('open')) closeCompose();
-  });
+  // Compose modal wiring (unchanged)
+  (() => {
+    const modal = document.getElementById('composeModal');
+    const txt = document.getElementById('composeText');
+    const btnClose = document.getElementById('closeCompose');
+    const btnCopy = document.getElementById('copyCompose');
+    const btnEmail = document.getElementById('openEmailCompose');
+    const btnWA = document.getElementById('openWhatsAppCompose');
 
-  // Copy
-  btnCopy?.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(txt.value);
-      btnCopy.textContent = 'Copied!';
-      setTimeout(() => (btnCopy.textContent = 'Copy'), 1200);
-    } catch {
-      alert('Copy failed. Select the text and press Ctrl/Cmd+C.');
+    function openCompose(initialText = '') {
+      if (typeof initialText === 'string' && txt) txt.value = initialText;
+      modal?.classList.add('open');
+      modal?.removeAttribute('aria-hidden');
+      document.documentElement.style.overflow = 'hidden';
+      setTimeout(() => txt?.focus(), 0);
     }
-  });
+    function closeCompose() {
+      modal?.classList.remove('open');
+      modal?.setAttribute('aria-hidden', 'true');
+      document.documentElement.style.overflow = '';
+    }
 
-  // Email (mailto)
-  btnEmail?.addEventListener('click', () => {
-    const subject = 'Medicine reorder';
-    const body = txt.value || '';
-    const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = url;
-  });
+    btnClose?.addEventListener('click', closeCompose);
+    modal?.addEventListener('click', e => { if (e.target === modal) closeCompose(); });
+    window.addEventListener('keydown', e => { if (e.key === 'Escape' && modal?.classList.contains('open')) closeCompose(); });
 
-  // WhatsApp (mobile or web)
-  btnWA?.addEventListener('click', () => {
-    const message = txt.value.trim();
-    const enc = encodeURIComponent(message || 'Hello!');
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const url = isMobile
-      ? `https://wa.me/?text=${enc}`
-      : `https://web.whatsapp.com/send?text=${enc}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  });
+    btnCopy?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(txt?.value || '');
+        if (btnCopy){ btnCopy.textContent = 'Copied!'; setTimeout(() => (btnCopy.textContent = 'Copy'), 1200); }
+      } catch { alert('Copy failed. Select the text and press Ctrl/Cmd+C.'); }
+    });
 
-  // Optional: auto-wire any button with [data-open-compose]
-  document.addEventListener('click', e => {
-    const trigger = e.target.closest('[data-open-compose]');
-    if (!trigger) return;
-    e.preventDefault();
-    const preset = trigger.getAttribute('data-compose-text') || '';
-    openCompose(preset);
-  });
+    btnEmail?.addEventListener('click', () => {
+      const subject = 'Medicine reorder';
+      const body = txt?.value || '';
+      const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.location.href = url;
+    });
 
-  // Expose openCompose globally so you can call it from anywhere
-  window.openCompose = openCompose;
-  window.closeCompose = closeCompose;
+    btnWA?.addEventListener('click', () => {
+      const message = (txt?.value || '').trim();
+      const enc = encodeURIComponent(message || 'Hello!');
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const url = isMobile ? `https://wa.me/?text=${enc}` : `https://web.whatsapp.com/send?text=${enc}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    });
+
+    document.addEventListener('click', e => {
+      const trigger = e.target.closest?.('[data-open-compose]');
+      if (!trigger) return;
+      e.preventDefault();
+      const preset = trigger.getAttribute('data-compose-text') || '';
+      openCompose(preset);
+    });
+
+    window.openCompose = openCompose;
+    window.closeCompose = closeCompose;
+  })();
 })();
